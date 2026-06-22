@@ -399,7 +399,7 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
             <div className="hidden md:flex items-center gap-3">
               <button
                 onClick={onGoToLogin}
-                className="px-5 py-2.5 text-sm font-bold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+                className="px-5 py-2.5 text-sm font-bold text-white bg-slate-900 dark:bg-white dark:text-slate-900 rounded-xl shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all"
               >
                 Iniciar Sesión
               </button>
@@ -443,7 +443,7 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
                   <button
                     onClick={onGoToLogin}
-                    className="w-full py-3 text-sm font-bold text-center rounded-xl border border-slate-200 dark:border-slate-700"
+                    className="w-full py-3 text-sm font-bold text-center rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900"
                   >
                     Iniciar Sesión
                   </button>
@@ -483,19 +483,6 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
           <div className="text-center max-w-4xl mx-auto">
-            {/* Badge */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800/50 mb-8"
-            >
-              <Sparkles size={14} className="text-yellow-600" />
-              <span className="text-xs font-bold uppercase tracking-wider text-yellow-700 dark:text-yellow-400">
-                Nuevo: Asistente IA con Google Gemini
-              </span>
-            </motion.div>
-
             {/* Heading */}
             <motion.h1
               initial={{ opacity: 0, y: 30 }}
