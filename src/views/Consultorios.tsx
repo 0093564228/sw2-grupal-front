@@ -42,7 +42,7 @@ export const Consultorios: React.FC = () => {
     try {
       const [roomsData, usersData] = await Promise.all([
         api.getConsultorios(),
-        api.getUsuarios(),
+        api.getVeterinarios(),
       ]);
       setRooms(roomsData);
       setUsers(usersData);
@@ -86,7 +86,8 @@ export const Consultorios: React.FC = () => {
     try {
       const payload = {
         ...form,
-        responsable_id: form.responsable_id || undefined,
+        // "" → null para poder quitar el responsable; un id para asignarlo
+        responsable_id: form.responsable_id || null,
       };
 
       if (editTarget) {
@@ -310,14 +311,13 @@ export const Consultorios: React.FC = () => {
                       <option value="LIBRE">Libre</option>
                       <option value="OCUPADO">Ocupado</option>
                       <option value="LIMPIEZA">Limpieza</option>
-                      <option value="MANTENIMIENTO">Mantenimiento</option>
                     </select>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                    Personal Responsable
+                    Veterinario Responsable
                   </label>
                   <select
                     value={form.responsable_id}
@@ -329,7 +329,7 @@ export const Consultorios: React.FC = () => {
                     <option value="">— Sin responsable fijo —</option>
                     {users.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.nombre} ({(u as any).rol?.nombre})
+                        Dr. {u.nombre}
                       </option>
                     ))}
                   </select>

@@ -24,11 +24,10 @@ interface CartItem {
 
 const calcTotalFicha = (ficha: FichaPendiente) => {
   let t = Number(ficha.servicio.precio_base);
-  for (const o of ficha.ordenes_lab) t += Number(o.examen.precio);
+  for (const s of ficha.servicios_realizados ?? [])
+    t += Number(s.precio) * s.cantidad;
   for (const c of ficha.consumos ?? [])
     t += Number(c.producto.precio_venta) * c.cantidad;
-  const detalles = ficha.soap?.receta?.detalles ?? [];
-  for (const d of detalles) t += Number(d.producto.precio_venta) * d.cantidad;
   return t;
 };
 
@@ -39,23 +38,20 @@ const buildLineasFicha = (ficha: FichaPendiente) => {
     desc: ficha.servicio.nombre,
     subtotal: Number(ficha.servicio.precio_base),
   });
-  for (const o of ficha.ordenes_lab)
+  for (const s of ficha.servicios_realizados ?? [])
     lines.push({
-      tipo: "LABORATORIO",
-      desc: o.examen.nombre,
-      subtotal: Number(o.examen.precio),
+      tipo: "SERVICIO",
+      desc:
+        s.cantidad > 1
+          ? `${s.servicio.nombre} x${s.cantidad}`
+          : s.servicio.nombre,
+      subtotal: Number(s.precio) * s.cantidad,
     });
   for (const c of ficha.consumos ?? [])
     lines.push({
       tipo: "SUMINISTRO",
       desc: `${c.producto.nombre} x${c.cantidad}`,
       subtotal: Number(c.producto.precio_venta) * c.cantidad,
-    });
-  for (const d of ficha.soap?.receta?.detalles ?? [])
-    lines.push({
-      tipo: "FARMACIA",
-      desc: `${d.producto.nombre} x${d.cantidad}`,
-      subtotal: Number(d.producto.precio_venta) * d.cantidad,
     });
   return lines;
 };
