@@ -143,8 +143,8 @@ export const Users: React.FC = () => {
         </button>
       </header>
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto">
+        <table className="w-full min-w-[640px] text-left border-collapse">
           <thead className="bg-slate-50 dark:bg-slate-800/50">
             <tr className="text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-100 dark:border-slate-800">
               <th className="px-6 py-4">Usuario</th>

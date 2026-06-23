@@ -537,7 +537,7 @@ export const Inventory: React.FC = () => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div>
                   <label className={labelCls}>Precio Venta (Bs.) *</label>
                   <input

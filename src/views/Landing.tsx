@@ -27,7 +27,22 @@ import {
   Play,
   Quote,
   MousePointerClick,
+  Loader2,
+  MessageCircle,
 } from "lucide-react";
+import { api } from "../utils/api";
+import { LeadModal } from "../components/LeadModal";
+
+// Datos de contacto reales del hospital
+const CONTACTO = {
+  email: "vetcareuagrm@gmail.com",
+  tel: "+59178143144",
+  whatsapp: "59178143144",
+  direccion:
+    "Módulo 236 de la Ciudad Universitaria, sobre la Av. Busch, entre el 2do y 3er anillo",
+};
+
+const emailValido = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.trim());
 
 /* ───────────────────── Animated Counter ───────────────────── */
 const AnimatedCounter: React.FC<{
@@ -334,6 +349,107 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
     setMobileMenuOpen(false);
   };
 
+  // ── Pago de planes (Stripe) + captura de lead ──
+  const [leadPlan, setLeadPlan] = useState<string | null>(null);
+  const [checkoutPlan, setCheckoutPlan] = useState<string | null>(null);
+  const [pago, setPago] = useState<null | { ok: boolean; plan?: string | null }>(
+    null,
+  );
+
+  const handlePlan = async (plan: string) => {
+    if (plan === "Enterprise") {
+      setLeadPlan("Enterprise");
+      return;
+    }
+    setCheckoutPlan(plan);
+    try {
+      const { url } = await api.crearCheckout(plan);
+      if (url) {
+        window.location.href = url;
+        return;
+      }
+      setLeadPlan(plan);
+    } catch {
+      // Sin pasarela configurada (o error) → captura de lead.
+      setLeadPlan(plan);
+    } finally {
+      setCheckoutPlan(null);
+    }
+  };
+
+  // ── Formulario de contacto / demo ──
+  const [contacto, setContacto] = useState({
+    nombre: "",
+    apellido: "",
+    email: "",
+    empresa: "",
+    mensaje: "",
+    website: "", // honeypot
+  });
+  const [contactoEnviando, setContactoEnviando] = useState(false);
+  const [contactoExito, setContactoExito] = useState(false);
+  const [contactoError, setContactoError] = useState<string | null>(null);
+  const setC = (k: keyof typeof contacto, v: string) =>
+    setContacto((c) => ({ ...c, [k]: v }));
+
+  const handleContacto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setContactoError(null);
+    if (contacto.nombre.trim().length < 2) {
+      setContactoError("Ingresa tu nombre.");
+      return;
+    }
+    if (!emailValido(contacto.email)) {
+      setContactoError("Ingresa un correo electrónico válido.");
+      return;
+    }
+    setContactoEnviando(true);
+    try {
+      await api.crearLead({
+        nombre: `${contacto.nombre} ${contacto.apellido}`.trim(),
+        email: contacto.email,
+        empresa: contacto.empresa,
+        mensaje: contacto.mensaje,
+        origen: "DEMO",
+        website: contacto.website,
+      });
+      setContactoExito(true);
+      setContacto({
+        nombre: "",
+        apellido: "",
+        email: "",
+        empresa: "",
+        mensaje: "",
+        website: "",
+      });
+    } catch (err: any) {
+      setContactoError(err?.message ?? "No se pudo enviar. Intenta de nuevo.");
+    } finally {
+      setContactoEnviando(false);
+    }
+  };
+
+  // Resultado del pago al volver de Stripe (?checkout=success|cancel)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const estado = params.get("checkout");
+    if (!estado) return;
+    if (estado === "success") {
+      const sid = params.get("session_id");
+      if (sid) {
+        api
+          .verificarCheckout(sid)
+          .then((r: any) => setPago({ ok: !!r?.pagado, plan: r?.plan }))
+          .catch(() => setPago({ ok: true }));
+      } else {
+        setPago({ ok: true });
+      }
+    } else if (estado === "cancel") {
+      setPago({ ok: false });
+    }
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+
   const navLinks = [
     { label: "Características", id: "features" },
     { label: "Precios", id: "pricing" },
@@ -344,6 +460,24 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans overflow-x-hidden">
+      {pago && (
+        <div
+          className={`fixed top-0 left-0 right-0 z-[210] px-4 py-3 text-center text-sm font-bold ${
+            pago.ok ? "bg-emerald-500 text-white" : "bg-slate-800 text-white"
+          }`}
+        >
+          {pago.ok
+            ? `✅ ¡Pago confirmado! Tu plan ${pago.plan ?? ""} quedó activado. Te contactaremos para los siguientes pasos.`
+            : "El pago no se completó. Puedes intentarlo cuando quieras."}
+          <button
+            onClick={() => setPago(null)}
+            className="ml-3 underline opacity-80"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+
       {/* ────────── NAVBAR ────────── */}
       <motion.nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
@@ -965,15 +1099,24 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
                 </ul>
 
                 <button
-                  className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all ${
+                  onClick={() => handlePlan(plan.name)}
+                  disabled={checkoutPlan === plan.name}
+                  className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all disabled:opacity-60 flex items-center justify-center gap-2 ${
                     plan.highlighted
                       ? "bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-900 shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 hover:scale-[1.02] active:scale-[0.98]"
                       : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-900 dark:text-white"
                   }`}
                 >
-                  {plan.price === "Contacto"
-                    ? "Contactar Ventas"
-                    : "Comenzar Ahora"}
+                  {checkoutPlan === plan.name ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Redirigiendo…
+                    </>
+                  ) : plan.price === "Contacto" ? (
+                    "Contactar Ventas"
+                  ) : (
+                    "Comenzar Ahora"
+                  )}
                 </button>
               </motion.div>
             ))}
@@ -1072,41 +1215,63 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
 
               <div className="mt-10 space-y-6">
                 {[
-                  { icon: Mail, label: "Email", value: "ventas@vet-erp.com" },
+                  {
+                    icon: Mail,
+                    label: "Email",
+                    value: CONTACTO.email,
+                    href: `mailto:${CONTACTO.email}`,
+                  },
                   {
                     icon: Phone,
                     label: "Teléfono",
-                    value: "+591 (2) 277-0000",
+                    value: CONTACTO.tel,
+                    href: `tel:${CONTACTO.tel}`,
                   },
-                  { icon: MapPin, label: "Oficina", value: "La Paz, Bolivia" },
                   {
-                    icon: Clock,
-                    label: "Horario",
-                    value: "Lun - Vie: 8:00 - 18:00",
+                    icon: MessageCircle,
+                    label: "WhatsApp",
+                    value: CONTACTO.tel,
+                    href: `https://wa.me/${CONTACTO.whatsapp}`,
                   },
-                ].map((info, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    viewport={{ once: true }}
-                    className="flex items-center gap-4"
-                  >
-                    <div className="h-12 w-12 rounded-xl bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center flex-shrink-0">
-                      <info.icon
-                        size={20}
-                        className="text-yellow-600 dark:text-yellow-400"
-                      />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-                        {info.label}
-                      </p>
-                      <p className="text-base font-semibold">{info.value}</p>
-                    </div>
-                  </motion.div>
-                ))}
+                  {
+                    icon: MapPin,
+                    label: "Oficina",
+                    value: CONTACTO.direccion,
+                    href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      CONTACTO.direccion,
+                    )}`,
+                  },
+                ].map((info, i) => {
+                  const externo = info.href.startsWith("http");
+                  return (
+                    <motion.a
+                      key={i}
+                      href={info.href}
+                      target={externo ? "_blank" : undefined}
+                      rel={externo ? "noopener noreferrer" : undefined}
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      viewport={{ once: true }}
+                      className="flex items-center gap-4 group"
+                    >
+                      <div className="h-12 w-12 rounded-xl bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center flex-shrink-0 group-hover:bg-yellow-200 dark:group-hover:bg-yellow-900/50 transition-colors">
+                        <info.icon
+                          size={20}
+                          className="text-yellow-600 dark:text-yellow-400"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                          {info.label}
+                        </p>
+                        <p className="text-base font-semibold break-words group-hover:text-yellow-600 dark:group-hover:text-yellow-400 transition-colors">
+                          {info.value}
+                        </p>
+                      </div>
+                    </motion.a>
+                  );
+                })}
               </div>
             </div>
 
@@ -1118,7 +1283,27 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
               className="bg-white dark:bg-slate-900 rounded-2xl p-8 border border-slate-200 dark:border-slate-800 shadow-xl"
             >
               <h3 className="text-xl font-black mb-6">Solicita una demo</h3>
-              <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+              <form
+                className="space-y-4"
+                onSubmit={handleContacto}
+                autoComplete="off"
+              >
+                {/* Honeypot anti-spam (oculto) */}
+                <input
+                  type="text"
+                  value={contacto.website}
+                  onChange={(e) => setC("website", e.target.value)}
+                  className="hidden"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                />
+                {contactoExito && (
+                  <p className="text-sm font-semibold text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 dark:text-emerald-400 rounded-xl px-4 py-3">
+                    ✅ ¡Gracias! Recibimos tu solicitud. Te contactaremos muy
+                    pronto.
+                  </p>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
@@ -1126,6 +1311,8 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
                     </label>
                     <input
                       type="text"
+                      value={contacto.nombre}
+                      onChange={(e) => setC("nombre", e.target.value)}
                       placeholder="Tu nombre"
                       className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-shadow"
                     />
@@ -1136,6 +1323,8 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
                     </label>
                     <input
                       type="text"
+                      value={contacto.apellido}
+                      onChange={(e) => setC("apellido", e.target.value)}
                       placeholder="Tu apellido"
                       className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-shadow"
                     />
@@ -1147,6 +1336,8 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
                   </label>
                   <input
                     type="email"
+                    value={contacto.email}
+                    onChange={(e) => setC("email", e.target.value)}
                     placeholder="correo@clinica.com"
                     className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-shadow"
                   />
@@ -1157,6 +1348,8 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
                   </label>
                   <input
                     type="text"
+                    value={contacto.empresa}
+                    onChange={(e) => setC("empresa", e.target.value)}
                     placeholder="Ej: Clínica Veterinaria San Martín"
                     className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-shadow"
                   />
@@ -1167,16 +1360,33 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
                   </label>
                   <textarea
                     rows={4}
+                    value={contacto.mensaje}
+                    onChange={(e) => setC("mensaje", e.target.value)}
                     placeholder="Cuéntanos sobre tu clínica y lo que necesitas..."
                     className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-yellow-400 focus:border-transparent transition-shadow resize-none"
                   />
                 </div>
+                {contactoError && (
+                  <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 rounded-xl px-4 py-3">
+                    {contactoError}
+                  </p>
+                )}
                 <button
                   type="submit"
-                  className="w-full py-4 bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-900 font-bold rounded-xl shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  disabled={contactoEnviando}
+                  className="w-full py-4 bg-gradient-to-r from-yellow-400 to-amber-500 text-slate-900 font-bold rounded-xl shadow-lg shadow-yellow-500/25 hover:shadow-yellow-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                 >
-                  Enviar Solicitud
-                  <ArrowRight size={18} />
+                  {contactoEnviando ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Enviando…
+                    </>
+                  ) : (
+                    <>
+                      Enviar Solicitud
+                      <ArrowRight size={18} />
+                    </>
+                  )}
                 </button>
               </form>
             </motion.div>
@@ -1211,18 +1421,18 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
               </h4>
               <ul className="space-y-2.5">
                 {[
-                  "Características",
-                  "Precios",
-                  "Integraciones",
-                  "Actualizaciones",
-                ].map((l) => (
-                  <li key={l}>
-                    <a
-                      href="#"
-                      className="text-sm text-slate-400 hover:text-white transition-colors"
+                  { l: "Características", id: "features" },
+                  { l: "Precios", id: "pricing" },
+                  { l: "Integraciones", id: "features" },
+                  { l: "Actualizaciones", id: "features" },
+                ].map((x) => (
+                  <li key={x.l}>
+                    <button
+                      onClick={() => scrollTo(x.id)}
+                      className="text-sm text-slate-400 hover:text-white transition-colors text-left"
                     >
-                      {l}
-                    </a>
+                      {x.l}
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -1232,14 +1442,19 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
                 Empresa
               </h4>
               <ul className="space-y-2.5">
-                {["Sobre Nosotros", "Blog", "Carreras", "Contacto"].map((l) => (
-                  <li key={l}>
-                    <a
-                      href="#"
-                      className="text-sm text-slate-400 hover:text-white transition-colors"
+                {[
+                  { l: "Sobre Nosotros", id: "testimonials" },
+                  { l: "Blog", id: "features" },
+                  { l: "Carreras", id: "contact" },
+                  { l: "Contacto", id: "contact" },
+                ].map((x) => (
+                  <li key={x.l}>
+                    <button
+                      onClick={() => scrollTo(x.id)}
+                      className="text-sm text-slate-400 hover:text-white transition-colors text-left"
                     >
-                      {l}
-                    </a>
+                      {x.l}
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -1256,12 +1471,12 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
                   "Seguridad",
                 ].map((l) => (
                   <li key={l}>
-                    <a
-                      href="#"
-                      className="text-sm text-slate-400 hover:text-white transition-colors"
+                    <button
+                      onClick={() => scrollTo("contact")}
+                      className="text-sm text-slate-400 hover:text-white transition-colors text-left"
                     >
                       {l}
-                    </a>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -1281,6 +1496,24 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
           </div>
         </div>
       </footer>
+
+      {leadPlan && (
+        <LeadModal
+          plan={leadPlan}
+          titulo={
+            leadPlan === "Enterprise"
+              ? "Contactar con Ventas"
+              : `Solicitar plan ${leadPlan}`
+          }
+          subtitulo={
+            leadPlan === "Enterprise"
+              ? "Cuéntanos sobre tu hospital o cadena y preparamos una propuesta a medida."
+              : "Déjanos tus datos y te ayudamos a activar tu plan."
+          }
+          origen="PLAN"
+          onClose={() => setLeadPlan(null)}
+        />
+      )}
     </div>
   );
 };

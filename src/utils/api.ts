@@ -53,6 +53,16 @@ export const api = {
   changePassword: (currentPassword: string, newPassword: string) =>
     patch("/perfil/password", { currentPassword, newPassword }),
 
+  // Landing pública: leads de contacto y pago de planes (Stripe)
+  crearLead: (data: unknown) => post("/leads", data),
+  crearCheckout: (plan: string, email?: string) =>
+    post("/checkout", { plan, email }),
+  verificarCheckout: (sessionId: string) =>
+    get(`/checkout/verify?session_id=${encodeURIComponent(sessionId)}`),
+  // Admin: ver suscripciones y leads recibidos desde la landing
+  getSuscripciones: () => get("/suscripciones"),
+  getLeads: () => get("/leads"),
+
   // Dashboard
   getKpis: () => get("/dashboard/kpis"),
 
@@ -127,6 +137,11 @@ export const api = {
   }) => post("/caja/venta-directa", data),
   anularRecibo: (id: string, motivo_anulacion: string) =>
     put(`/caja/recibos/${id}/anular`, { motivo_anulacion }),
+  // Arqueo y cierre de caja
+  getArqueo: (fecha?: string) =>
+    get(`/caja/arqueo${fecha ? `?fecha=${fecha}` : ""}`),
+  getCierres: () => get("/caja/cierres"),
+  registrarCierre: (data: unknown) => post("/caja/cierres", data),
 
   // Catálogos
   getEspecies: () => get("/catalogos/especies"),

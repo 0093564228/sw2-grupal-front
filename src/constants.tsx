@@ -44,6 +44,7 @@ import {
   Check,
   Maximize,
   Minimize,
+  Menu,
 } from "lucide-react";
 
 export const Icons = {
@@ -91,6 +92,7 @@ export const Icons = {
   Check,
   Maximize,
   Minimize,
+  Menu,
   MeetingRoom: DoorOpen,
   CleaningServices: Sparkles,
 };

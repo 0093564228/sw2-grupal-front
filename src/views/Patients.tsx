@@ -502,7 +502,7 @@ export const Patients: React.FC = () => {
             </div>
 
             {propietarioMode === "nuevo" ? (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Nombre Propietario *
@@ -892,7 +892,7 @@ export const Patients: React.FC = () => {
                       />
                     </div>
 
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div>
                         <label className="block text-xs font-bold mb-1 text-slate-500">
                           Peso (kg)
