@@ -87,7 +87,7 @@ export const Users: React.FC = () => {
     try {
       if (editTarget) {
         // En edición no mandamos password a menos que se quiera implementar un reset
-        const { password, ...payload } = form;
+        const { password: _password, ...payload } = form;
         await api.updateUsuario(editTarget.id, payload);
         toast.success("Usuario actualizado correctamente");
       } else {

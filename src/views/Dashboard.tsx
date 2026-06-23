@@ -19,7 +19,7 @@ import { DashboardKpis, Consultorio } from "../types";
 const estadoLabel: Record<Consultorio["estado"], string> = {
   LIBRE: "Libre",
   OCUPADO: "Ocupado",
-  MANTENIMIENTO: "Mantenimiento",
+  LIMPIEZA: "Limpieza",
 };
 
 function getRole(): string {
@@ -530,11 +530,7 @@ export const Dashboard: React.FC = () => {
           ? "📋 Recepcionista"
           : role === "CAJERO"
             ? "💳 Cajero"
-            : role === "LABORATORISTA"
-              ? "🧪 Laboratorista"
-              : role === "FARMACEUTICO"
-                ? "💊 Farmacéutico"
-                : "👤 Usuario";
+            : "👤 Usuario";
 
     return (
       <motion.div
@@ -841,7 +837,7 @@ export const Dashboard: React.FC = () => {
                     "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
                   room.estado === "LIBRE" &&
                     "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400",
-                  room.estado === "MANTENIMIENTO" &&
+                  room.estado === "LIMPIEZA" &&
                     "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
                 )}
               >
@@ -854,7 +850,7 @@ export const Dashboard: React.FC = () => {
                   room.estado === "OCUPADO" && "bg-red-50 dark:bg-red-900/10",
                   room.estado === "LIBRE" &&
                     "bg-emerald-50 dark:bg-emerald-900/10",
-                  room.estado === "MANTENIMIENTO" &&
+                  room.estado === "LIMPIEZA" &&
                     "bg-blue-50 dark:bg-blue-900/10",
                 )}
               >
@@ -863,7 +859,7 @@ export const Dashboard: React.FC = () => {
                   className={cn(
                     room.estado === "OCUPADO" && "text-red-300",
                     room.estado === "LIBRE" && "text-emerald-300",
-                    room.estado === "MANTENIMIENTO" && "text-blue-300",
+                    room.estado === "LIMPIEZA" && "text-blue-300",
                   )}
                 />
               </div>
@@ -884,14 +880,14 @@ export const Dashboard: React.FC = () => {
                   <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 py-4 dark:border-slate-700 dark:bg-slate-800/50">
                     <p className="text-sm text-slate-400">Disponible</p>
                   </div>
-                ) : room.estado === "MANTENIMIENTO" ? (
+                ) : room.estado === "LIMPIEZA" ? (
                   <div className="flex flex-1 flex-col items-center justify-center rounded-lg bg-blue-50 py-3 dark:bg-blue-900/10">
                     <Icons.CleaningServices
                       className="text-blue-400 animate-pulse"
                       size={20}
                     />
                     <p className="mt-1 text-xs text-blue-600 dark:text-blue-400 font-medium">
-                      En mantenimiento
+                      En limpieza
                     </p>
                   </div>
                 ) : (

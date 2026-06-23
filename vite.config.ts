@@ -1,16 +1,13 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig } from "vite";
 
-export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, ".", "");
+export default defineConfig(() => {
   return {
     plugins: [react(), tailwindcss()],
-    define: {
-      // GEMINI_API_KEY no sigue la convención VITE_ por lo que se expone manualmente
-      "process.env.GEMINI_API_KEY": JSON.stringify(env.GEMINI_API_KEY),
-    },
+    // El asistente de IA se consume vía el backend (/api/chatbot/emergencia).
+    // La GEMINI_API_KEY vive SOLO en el backend; nunca debe exponerse al cliente.
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "."),

@@ -10,7 +10,8 @@ const headers = () => {
 
 const checkOk = async (r: Response) => {
   const data = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(data?.error ?? `Error HTTP ${r.status}`);
+  if (!r.ok)
+    throw new Error(data?.message ?? data?.error ?? `Error HTTP ${r.status}`);
   return data;
 };
 
@@ -28,6 +29,12 @@ const put = (url: string, body?: unknown) =>
     headers: headers(),
     body: body ? JSON.stringify(body) : undefined,
   }).then(checkOk);
+const patch = (url: string, body?: unknown) =>
+  fetch(`${BASE}${url}`, {
+    method: "PATCH",
+    headers: headers(),
+    body: body ? JSON.stringify(body) : undefined,
+  }).then(checkOk);
 const del = (url: string) =>
   fetch(`${BASE}${url}`, { method: "DELETE", headers: headers() }).then(
     checkOk,
@@ -41,6 +48,10 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     }).then((r) => r.json()),
+
+  // Perfil del usuario autenticado: cambiar la propia contraseña
+  changePassword: (currentPassword: string, newPassword: string) =>
+    patch("/perfil/password", { currentPassword, newPassword }),
 
   // Dashboard
   getKpis: () => get("/dashboard/kpis"),
@@ -76,8 +87,6 @@ export const api = {
   cancelarFicha: (id: string) => put(`/fichas/${id}/cancelar`),
   getSoap: (id: string) => get(`/fichas/${id}/soap`),
   upsertSoap: (id: string, data: unknown) => put(`/fichas/${id}/soap`, data),
-  createReceta: (id: string, data: unknown) =>
-    post(`/fichas/${id}/receta`, data),
 
   // Consultorios
   getConsultorios: () => get("/consultorios"),
@@ -119,15 +128,6 @@ export const api = {
   anularRecibo: (id: string, motivo_anulacion: string) =>
     put(`/caja/recibos/${id}/anular`, { motivo_anulacion }),
 
-  // Laboratorio
-  getOrdenes: (estado?: string) =>
-    get(`/laboratorio${estado ? `?estado=${estado}` : ""}`),
-  createOrden: (data: unknown) => post("/laboratorio", data),
-  updateEstadoOrden: (id: string, estado: string) =>
-    put(`/laboratorio/${id}/estado`, { estado }),
-  cargarResultado: (id: string, data: unknown) =>
-    post(`/laboratorio/${id}/resultado`, data),
-
   // Catálogos
   getEspecies: () => get("/catalogos/especies"),
   getRazas: (especie_id?: string) =>
@@ -135,9 +135,39 @@ export const api = {
   getColores: () => get("/catalogos/colores"),
   getAlergias: () => get("/catalogos/alergias"),
   getServicios: () => get("/catalogos/servicios"),
-  getExamenes: () => get("/catalogos/examenes"),
   getCategorias: () => get("/catalogos/categorias"),
+
+  // Servicios (catálogo gestionable por Admin)
+  getServiciosCatalogo: () => get("/servicios"),
+  getServiciosActivos: () => get("/servicios?activos=true"),
+  createServicio: (data: unknown) => post("/servicios", data),
+  updateServicio: (id: string, data: unknown) => put(`/servicios/${id}`, data),
+  deleteServicio: (id: string) => del(`/servicios/${id}`),
+
+  // Servicios realizados en una ficha (consulta)
+  getFichaServicios: (id: string) => get(`/fichas/${id}/servicios`),
+  addFichaServicio: (
+    id: string,
+    data: { servicio_id: string; cantidad?: number },
+  ) => post(`/fichas/${id}/servicios`, data),
+  removeFichaServicio: (id: string, servicioId: string) =>
+    del(`/fichas/${id}/servicios/${servicioId}`),
+
+  // Historia clínica
+  getHistoriasMascota: (mascotaId: string) =>
+    get(`/historias?mascota_id=${mascotaId}`),
+  getHistoriaByFicha: (fichaId: string) =>
+    get(`/historias?ficha_id=${fichaId}`),
+  getHistoria: (id: string) => get(`/historias/${id}`),
+  createHistoria: (data: unknown) => post("/historias", data),
+  updateHistoria: (id: string, data: unknown) =>
+    patch(`/historias/${id}`, data),
+  finalizarHistoria: (id: string) => post(`/historias/${id}/finalizar`, {}),
+  deleteHistoria: (id: string) => del(`/historias/${id}`),
   getRoles: () => get("/catalogos/roles"),
+  getVeterinarios: () => get("/catalogos/veterinarios"),
+  getPropietarios: (search?: string) =>
+    get(`/catalogos/propietarios${search ? `?search=${encodeURIComponent(search)}` : ""}`),
 
   // Usuarios
   getUsuarios: (rol?: string, search?: string) => {
@@ -153,19 +183,40 @@ export const api = {
   deleteUsuario: (id: string) => del(`/usuarios/${id}`),
 
   // Agenda
-  getCitas: (fecha?: string, doctor_id?: string) => {
+  getCitas: (
+    fecha?: string,
+    doctor_id?: string,
+    desde?: string,
+    hasta?: string,
+  ) => {
     const p = new URLSearchParams();
     if (fecha) p.set("fecha", fecha);
     if (doctor_id) p.set("doctor_id", doctor_id);
+    if (desde) p.set("desde", desde);
+    if (hasta) p.set("hasta", hasta);
     const qs = p.toString();
     return get(`/agenda${qs ? `?${qs}` : ""}`);
   },
   createCita: (data: unknown) => post("/agenda", data),
+  getSolicitudes: () => get("/agenda/solicitudes"),
   updateCita: (id: string, data: unknown) => put(`/agenda/${id}`, data),
   updateEstadoCita: (id: string, estado: string) =>
     put(`/agenda/${id}/estado`, { estado }),
   checkInCita: (id: string) => post(`/agenda/${id}/checkin`, {}),
   deleteCita: (id: string) => del(`/agenda/${id}`),
+
+  getDisponibilidad: (fecha: string, doctor_id?: string, duracion?: number) => {
+    const p = new URLSearchParams();
+    p.set("fecha", fecha);
+    if (doctor_id) p.set("doctor_id", doctor_id);
+    if (duracion) p.set("duracion", String(duracion));
+    return get(`/agenda/disponibilidad?${p.toString()}`);
+  },
+
+  // Autoservicio del propietario (rol CLIENTE)
+  getMisCitas: () => get("/agenda/mis-citas"),
+  getMisMascotas: () => get("/agenda/mis-mascotas"),
+  solicitarCita: (data: unknown) => post("/agenda/solicitar", data),
 
   // Consumos en consulta
   getConsumos: (ficha_id: string) => get(`/fichas/${ficha_id}/consumos`),
@@ -175,10 +226,6 @@ export const api = {
   ) => post(`/fichas/${ficha_id}/consumos`, data),
   removeConsumo: (ficha_id: string, consumoId: string) =>
     del(`/fichas/${ficha_id}/consumos/${consumoId}`),
-
-  // Farmacia
-  getRecetasPendientes: () => get("/farmacia/recetas"),
-  dispensarReceta: (id: string) => put(`/farmacia/recetas/${id}/dispensar`, {}),
 
   // Chatbot IA
   getEmergencyAdvice: (message: string, history: unknown[]) =>

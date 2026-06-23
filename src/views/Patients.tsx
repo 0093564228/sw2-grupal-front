@@ -4,6 +4,8 @@ import { Icons } from "../constants";
 import { cn } from "../utils/cn";
 import { api } from "../utils/api";
 import { toast } from "sonner";
+import type { HistoriaResumen, HistoriaClinica } from "../types";
+import { HistoriaClinicaFicha } from "../components/HistoriaClinicaFicha";
 
 interface EspecieObj {
   id: string;
@@ -67,17 +69,6 @@ const speciesEmojis: Record<string, string> = {
   Pez: "🐠",
 };
 
-const estadoColors: Record<string, string> = {
-  ESPERA:
-    "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800",
-  EN_CURSO:
-    "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800",
-  COMPLETADA:
-    "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800",
-  CANCELADA:
-    "bg-slate-100 text-slate-400 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700",
-};
-
 const formatDate = (d: string) =>
   new Date(d).toLocaleDateString("es-ES", {
     day: "2-digit",
@@ -90,6 +81,9 @@ export const Patients: React.FC = () => {
   const [selectedPatient, setSelectedPatient] = useState<Mascota | null>(null);
   const [view, setView] = useState<"list" | "detail" | "new">("list");
   const [detailTab, setDetailTab] = useState<"history" | "soap">("history");
+  const [historias, setHistorias] = useState<HistoriaResumen[]>([]);
+  const [historiaAbierta, setHistoriaAbierta] =
+    useState<HistoriaClinica | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -120,7 +114,6 @@ export const Patients: React.FC = () => {
     propietario_email: "",
     propietario_telefono: "",
     propietario_ci: "",
-    propietario_password: "",
   });
 
   const [soapForm, setSoapForm] = useState({
@@ -134,15 +127,10 @@ export const Patients: React.FC = () => {
     fr: "",
   });
   const [isSavingSoap, setIsSavingSoap] = useState(false);
-  const [labOrders, setLabOrders] = useState<{ id: string; nombre: string }[]>(
-    [],
-  );
-  const [selectedExams, setSelectedExams] = useState<string[]>([]);
 
   useEffect(() => {
     loadPatients();
     api.getEspecies().then(setEspecies).catch(console.error);
-    api.getExamenes().then(setLabOrders).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -182,8 +170,20 @@ export const Patients: React.FC = () => {
       setSelectedPatient(data);
       setDetailTab("history");
       setView("detail");
+      api
+        .getHistoriasMascota(id)
+        .then(setHistorias)
+        .catch(() => setHistorias([]));
     } catch (err: any) {
       toast.error(err.message ?? "Error cargando paciente");
+    }
+  };
+
+  const openHistoria = async (id: string) => {
+    try {
+      setHistoriaAbierta(await api.getHistoria(id));
+    } catch (e: any) {
+      toast.error(e.message ?? "Error al abrir la historia clínica");
     }
   };
 
@@ -191,9 +191,13 @@ export const Patients: React.FC = () => {
     try {
       const servicios = await api.getServicios();
       const serv =
+        (servicios as any[]).find(
+          (s) => s.nombre.toLowerCase() === "consulta general",
+        ) ||
         (servicios as any[]).find((s) =>
           s.nombre.toLowerCase().includes("consulta"),
-        ) || servicios[0];
+        ) ||
+        servicios[0];
       if (!serv) throw new Error("No hay servicios configurados en el sistema");
       await api.createFicha({
         mascota_id: mascotaId,
@@ -214,10 +218,7 @@ export const Patients: React.FC = () => {
   const handleSearchPropietario = async () => {
     if (!propietarioSearch.trim()) return;
     try {
-      const results = await api.getUsuarios(
-        "CLIENTE",
-        propietarioSearch.trim(),
-      );
+      const results = await api.getPropietarios(propietarioSearch.trim());
       setPropietarioResults(results as PropietarioResult[]);
       if ((results as PropietarioResult[]).length === 0) {
         toast.info("No se encontró ningún propietario con esos datos");
@@ -234,16 +235,6 @@ export const Patients: React.FC = () => {
       toast.error("Debes seleccionar un propietario existente");
       return;
     }
-    if (
-      propietarioMode === "nuevo" &&
-      form.propietario_password.trim().length < 6
-    ) {
-      toast.error(
-        "La contraseña del propietario debe tener al menos 6 caracteres",
-      );
-      return;
-    }
-
     try {
       const payload: Record<string, unknown> = {
         mascota: {
@@ -266,7 +257,6 @@ export const Patients: React.FC = () => {
           email: form.propietario_email,
           telefono: form.propietario_telefono || undefined,
           ci: form.propietario_ci || undefined,
-          password: form.propietario_password || undefined,
         };
       }
 
@@ -287,7 +277,6 @@ export const Patients: React.FC = () => {
         propietario_email: "",
         propietario_telefono: "",
         propietario_ci: "",
-        propietario_password: "",
       });
       setPropietarioMode("nuevo");
       setPropietarioSearch("");
@@ -308,9 +297,13 @@ export const Patients: React.FC = () => {
     try {
       const servicios = await api.getServicios();
       const servConsulta =
+        (servicios as any[]).find(
+          (s) => s.nombre.toLowerCase() === "consulta general",
+        ) ||
         (servicios as any[]).find((s) =>
           s.nombre.toLowerCase().includes("consulta"),
-        ) || servicios[0];
+        ) ||
+        servicios[0];
 
       const ficha = await api.createFicha({
         mascota_id: selectedPatient.id,
@@ -329,21 +322,8 @@ export const Patients: React.FC = () => {
         fr: soapForm.fr ? parseInt(soapForm.fr) : undefined,
       });
 
-      if (selectedExams.length > 0) {
-        await Promise.all(
-          selectedExams.map((examen_id) =>
-            api.createOrden({
-              ficha_id: ficha.id,
-              examen_id,
-              prioridad: "NORMAL",
-            }),
-          ),
-        );
-        toast.success("Consulta guardada con órdenes de laboratorio");
-      } else {
-        await api.completarFicha(ficha.id);
-        toast.success("Consulta finalizada correctamente");
-      }
+      await api.completarFicha(ficha.id);
+      toast.success("Consulta finalizada correctamente");
 
       setSoapForm({
         motivo: "",
@@ -355,7 +335,6 @@ export const Patients: React.FC = () => {
         fc: "",
         fr: "",
       });
-      setSelectedExams([]);
       setDetailTab("history");
       await selectPatient(selectedPatient.id);
     } catch (err: any) {
@@ -544,6 +523,7 @@ export const Patients: React.FC = () => {
                   <input
                     type="email"
                     required
+                    autoComplete="off"
                     value={form.propietario_email}
                     onChange={(e) =>
                       setForm({ ...form, propietario_email: e.target.value })
@@ -568,6 +548,7 @@ export const Patients: React.FC = () => {
                     CI / Carnet
                   </label>
                   <input
+                    autoComplete="off"
                     value={form.propietario_ci}
                     onChange={(e) =>
                       setForm({ ...form, propietario_ci: e.target.value })
@@ -575,22 +556,12 @@ export const Patients: React.FC = () => {
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary outline-none"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Contraseña de acceso *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={form.propietario_password}
-                    onChange={(e) =>
-                      setForm({ ...form, propietario_password: e.target.value })
-                    }
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-4 py-2 text-sm focus:ring-2 focus:ring-primary outline-none"
-                  />
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Esta sera la clave para que el cliente ingrese al sistema.
+                <div className="col-span-2">
+                  <p className="text-[11px] text-slate-500">
+                    Se creará una cuenta de acceso para el propietario con la
+                    contraseña temporal <strong>123456</strong>. El propietario
+                    podrá cambiarla desde <strong>Mi Perfil</strong> cuando
+                    inicie sesión.
                   </p>
                 </div>
               </div>
@@ -805,7 +776,7 @@ export const Patients: React.FC = () => {
               )}
             >
               <Icons.History size={14} className="inline mr-1.5" />
-              Historia Clínica ({selectedPatient.fichas?.length ?? 0})
+              Historia Clínica ({historias.length})
             </button>
             <button
               onClick={() => setDetailTab("soap")}
@@ -834,78 +805,62 @@ export const Patients: React.FC = () => {
                 className="max-w-3xl mx-auto space-y-4"
               >
                 <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-6">
-                  Historial de Atenciones ·{" "}
-                  {selectedPatient.fichas?.length ?? 0} registros
+                  Historias Clínicas · {historias.length} registro
+                  {historias.length === 1 ? "" : "s"}
                 </h3>
-                {(selectedPatient.fichas ?? []).length === 0 ? (
+                {historias.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-48 opacity-30 space-y-3">
                     <Icons.FileText size={56} />
-                    <p className="font-bold text-lg">Sin historial clínico</p>
+                    <p className="font-bold text-lg">Sin historias clínicas</p>
                     <p className="text-sm">
-                      Usa la pestaña "Nueva Atención" para registrar una
-                      consulta
+                      Las historias se generan al atender al paciente en "Mi
+                      Consulta".
                     </p>
                   </div>
                 ) : (
-                  (selectedPatient.fichas ?? []).map((ficha) => (
-                    <div
-                      key={ficha.id}
-                      className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm"
+                  historias.map((h) => (
+                    <button
+                      key={h.id}
+                      onClick={() => openHistoria(h.id)}
+                      className="w-full text-left bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm hover:border-primary/50 transition-colors"
                     >
-                      <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-start justify-between mb-2">
                         <div>
                           <span className="text-xs font-black text-primary block">
-                            {formatDate(ficha.fecha_hora)}
+                            {formatDate(h.fecha)} · Nº{" "}
+                            {String(h.folio).padStart(6, "0")}
                           </span>
                           <h4 className="font-bold text-slate-900 dark:text-white">
-                            {ficha.servicio?.nombre ?? "Consulta"}
+                            {h.motivo_consulta || "Consulta"}
                           </h4>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-                            {ficha.doctor && (
-                              <span>Dr. {ficha.doctor.nombre}</span>
-                            )}
-                            {ficha.consultorio && (
-                              <span>{ficha.consultorio.nombre}</span>
-                            )}
-                          </div>
+                          {h.atendido_por?.nombre && (
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {h.atendido_por.nombre}
+                            </p>
+                          )}
                         </div>
                         <span
                           className={cn(
                             "text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-widest border",
-                            estadoColors[ficha.estado] ??
-                              estadoColors.CANCELADA,
+                            h.estado === "FINALIZADA"
+                              ? "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400"
+                              : "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400",
                           )}
                         >
-                          {ficha.estado}
+                          {h.estado === "FINALIZADA" ? "Finalizada" : "Borrador"}
                         </span>
                       </div>
-
-                      {ficha.soap &&
-                        (ficha.soap.diagnostico || ficha.soap.tratamiento) && (
-                          <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {ficha.soap.diagnostico && (
-                              <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                                  Diagnóstico
-                                </p>
-                                <p className="text-sm text-slate-700 dark:text-slate-300">
-                                  {ficha.soap.diagnostico}
-                                </p>
-                              </div>
-                            )}
-                            {ficha.soap.tratamiento && (
-                              <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">
-                                  Tratamiento
-                                </p>
-                                <p className="text-sm text-slate-700 dark:text-slate-300">
-                                  {ficha.soap.tratamiento}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                    </div>
+                      {(h.diagnostico_confirmativo ||
+                        h.diagnostico_presuntivo) && (
+                        <p className="text-sm text-slate-700 dark:text-slate-300 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2">
+                            Diagnóstico
+                          </span>
+                          {h.diagnostico_confirmativo ||
+                            h.diagnostico_presuntivo}
+                        </p>
+                      )}
+                    </button>
                   ))
                 )}
               </motion.div>
@@ -1045,35 +1000,6 @@ export const Patients: React.FC = () => {
                       />
                     </div>
 
-                    {labOrders.length > 0 && (
-                      <div>
-                        <label className="block text-sm font-bold mb-2">
-                          Órdenes de Laboratorio
-                        </label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {labOrders.map((exam) => (
-                            <label
-                              key={exam.id}
-                              className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedExams.includes(exam.id)}
-                                onChange={(e) =>
-                                  setSelectedExams((prev) =>
-                                    e.target.checked
-                                      ? [...prev, exam.id]
-                                      : prev.filter((id) => id !== exam.id),
-                                  )
-                                }
-                                className="accent-primary"
-                              />
-                              <span className="text-sm">{exam.nombre}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   <div className="flex justify-end gap-4">
@@ -1097,6 +1023,25 @@ export const Patients: React.FC = () => {
             )}
           </AnimatePresence>
         </div>
+
+        {historiaAbierta && (
+          <div
+            className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/80 p-4 overflow-y-auto"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setHistoriaAbierta(null);
+            }}
+          >
+            <div className="relative my-6 w-full max-w-[880px]">
+              <button
+                onClick={() => setHistoriaAbierta(null)}
+                className="absolute -top-3 -right-3 z-10 h-8 w-8 rounded-full bg-white text-slate-700 shadow flex items-center justify-center"
+              >
+                <Icons.X size={18} />
+              </button>
+              <HistoriaClinicaFicha historia={historiaAbierta} readOnly />
+            </div>
+          </div>
+        )}
       </motion.div>
     );
   }

@@ -5,13 +5,10 @@ import {
   Stethoscope,
   Package,
   Calendar,
-  TrendingUp,
   ShieldCheck,
-  Microscope,
   Monitor,
   Banknote,
   ChevronRight,
-  Star,
   Check,
   ArrowRight,
   Menu,
@@ -140,15 +137,9 @@ const features = [
     color: "from-blue-400 to-indigo-500",
   },
   {
-    icon: Microscope,
-    title: "Laboratorio Integrado",
-    desc: "Órdenes de examen, seguimiento de estados y carga de resultados con interpretación clínica.",
-    color: "from-violet-400 to-purple-500",
-  },
-  {
     icon: Package,
-    title: "Inventario & Farmacia",
-    desc: "Control de stock en tiempo real, kardex de movimientos, alertas de reposición y recetas digitales.",
+    title: "Inventario & Stock",
+    desc: "Control de stock en tiempo real, kardex de movimientos y alertas de reposición de productos.",
     color: "from-pink-400 to-rose-500",
   },
   {
@@ -182,13 +173,13 @@ const testimonials = [
   {
     name: "Dra. María González",
     role: "Directora — Clínica VetSalud",
-    text: "Desde que implementamos VET-ERP, la eficiencia de nuestra clínica mejoró un 60%. Los módulos de consulta y laboratorio son increíblemente intuitivos.",
+    text: "Desde que implementamos VET-ERP, la eficiencia de nuestra clínica mejoró un 60%. Los módulos de consulta y caja son increíblemente intuitivos.",
     avatar: "MG",
   },
   {
     name: "Dr. Carlos Mendoza",
     role: "Veterinario Jefe — Hospital Animal Plus",
-    text: "La integración entre inventario, farmacia y caja nos permite un control total del negocio. El soporte técnico es excepcional.",
+    text: "La integración entre inventario y caja nos permite un control total del negocio. El soporte técnico es excepcional.",
     avatar: "CM",
   },
   {
@@ -220,9 +211,8 @@ const plans = [
     features: [
       "Hasta 15 usuarios",
       "Todos los módulos incluidos",
-      "Laboratorio integrado",
       "POS & facturación",
-      "Inventario & farmacia",
+      "Inventario & stock",
       "Asistente IA",
       "Sala de espera digital",
       "Soporte prioritario 24/7",
@@ -784,7 +774,7 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
             {/* Connection line */}
             <div className="hidden md:block absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-yellow-400/0 via-yellow-400/30 to-yellow-400/0 -translate-y-1/2" />
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6 md:gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 md:gap-4">
               {[
                 {
                   icon: Users,
@@ -800,11 +790,6 @@ export const Landing: React.FC<{ onGoToLogin?: () => void }> = ({
                   icon: Stethoscope,
                   label: "Consulta",
                   desc: "Diagnóstico SOAP completo",
-                },
-                {
-                  icon: Microscope,
-                  label: "Laboratorio",
-                  desc: "Exámenes y resultados",
                 },
                 {
                   icon: Banknote,

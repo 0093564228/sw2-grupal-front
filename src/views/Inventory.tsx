@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "motion/react";
 import { Icons } from "../constants";
 import { cn } from "../utils/cn";
 import { api } from "../utils/api";
-import { toast } from "sonner";
 import { Producto, CategoriaProducto } from "../types";
 
 type ModalMode = "none" | "create" | "edit" | "stock";
@@ -60,14 +59,6 @@ const labelCls =
   "block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1";
 
 export const Inventory: React.FC = () => {
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
-  const initialSection =
-    user?.rol?.nombre === "FARMACEUTICO" ? "FARMACIA" : "PRODUCTOS";
-  const [section, setSection] = useState<"PRODUCTOS" | "FARMACIA">(
-    initialSection,
-  );
-  const [recetas, setRecetas] = useState<any[]>([]);
-  const [loadingRecetas, setLoadingRecetas] = useState(false);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<CategoriaProducto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -238,7 +229,7 @@ export const Inventory: React.FC = () => {
       <header className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-            Inventario y Farmacia
+            Inventario
           </h2>
           <p className="text-slate-500 dark:text-slate-400">
             Gestión de stock y suministros

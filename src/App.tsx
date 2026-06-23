@@ -6,10 +6,11 @@ import { Patients } from "./views/Patients";
 import { Inventory } from "./views/Inventory";
 import { POS } from "./views/POS";
 import { Consultorios } from "./views/Consultorios";
-import { Laboratory } from "./views/Laboratory";
+import { Services } from "./views/Services";
 import { Financial } from "./views/Financial";
 import { WaitingRoom } from "./views/WaitingRoom";
 import { Agenda } from "./views/Agenda";
+import { MiAgenda } from "./views/MiAgenda";
 import { Users } from "./views/Users";
 import Consultation from "./views/Consultation";
 import { ChatAssistant } from "./components/ChatAssistant";
@@ -273,18 +274,20 @@ const App: React.FC = () => {
         return <Patients />;
       case "inventory":
         return <Inventory />;
-      case "farmacia":
-        return <Inventory />;
       case "pos":
         return <POS />;
       case "consultorios":
         return <Consultorios />;
-      case "laboratory":
-        return <Laboratory />;
+      case "servicios":
+        return <Services />;
       case "financial":
         return <Financial />;
-      case "agenda":
-        return <Agenda />;
+      case "agenda": {
+        // El propietario (CLIENTE) ve su propia agenda de autoservicio.
+        const rolActual = JSON.parse(localStorage.getItem("user") || "{}")?.rol
+          ?.nombre;
+        return rolActual === "CLIENTE" ? <MiAgenda /> : <Agenda />;
+      }
       case "users":
         return <Users />;
       case "waiting-room":
@@ -396,7 +399,11 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto">{renderView()}</div>
+        {currentView === "waiting-room" ? (
+          <div className="flex-1 min-h-0 bg-slate-950">{renderView()}</div>
+        ) : (
+          <div className="flex-1 overflow-y-auto">{renderView()}</div>
+        )}
       </main>
 
       {/* Botón flotante de IA de Emergencias */}

@@ -47,13 +47,15 @@ export const ChatAssistant: React.FC = () => {
         ...prev,
         { role: "bot", content: String(replyText) },
       ]);
-    } catch (err) {
+    } catch (err: any) {
       setMessages((prev) => [
         ...prev,
         {
           role: "bot",
           content:
-            "⚠️ Error: No pude conectarme con el servidor de inteligencia artificial.",
+            "⚠️ " +
+            (err?.message ||
+              "No pude conectarme con el servidor de inteligencia artificial."),
         },
       ]);
     } finally {

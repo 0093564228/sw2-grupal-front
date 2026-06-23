@@ -42,6 +42,8 @@ import {
   Monitor,
   Inbox,
   Check,
+  Maximize,
+  Minimize,
 } from "lucide-react";
 
 export const Icons = {
@@ -87,6 +89,8 @@ export const Icons = {
   Moon,
   Inbox,
   Check,
+  Maximize,
+  Minimize,
   MeetingRoom: DoorOpen,
   CleaningServices: Sparkles,
 };

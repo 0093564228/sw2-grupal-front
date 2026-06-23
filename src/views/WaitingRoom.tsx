@@ -28,12 +28,39 @@ interface DoctorOption {
   nombre: string;
 }
 
+// Antepone "Dr." solo si el nombre no lo trae ya (evita "Dr. Dr. ...").
+const conDr = (nombre?: string) => {
+  const n = (nombre ?? "").trim();
+  if (!n) return "";
+  return /^dra?\.?\s/i.test(n) ? n : `Dr. ${n}`;
+};
+
 export const WaitingRoom: React.FC<{ onClose?: () => void }> = ({
-  onClose,
+  onClose: _onClose,
 }) => {
   const [fichas, setFichas] = useState<WaitingFicha[]>([]);
   const [calling, setCalling] = useState<WaitingFicha | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onFsChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFsChange);
+    return () => document.removeEventListener("fullscreenchange", onFsChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      // Solo el contenedor de la Sala de Espera (no el sidebar ni el fondo del body)
+      rootRef.current?.requestFullscreen?.().catch(() => {});
+    } else {
+      document.exitFullscreen?.();
+    }
+  };
+
+  // Panel de consultorios (todas las salas, refrescadas en loadData)
+  const [consultorios, setConsultorios] = useState<SalaOption[]>([]);
 
   // Modal: iniciar atención
   const [iniciarId, setIniciarId] = useState<string | null>(null);
@@ -59,18 +86,28 @@ export const WaitingRoom: React.FC<{ onClose?: () => void }> = ({
 
   const loadData = useCallback(async () => {
     try {
-      const data = await api.getFichas();
-      const active = (data as WaitingFicha[]).filter(
-        (f) => f.estado === "ESPERA" || f.estado === "EN_CURSO",
-      );
-      setFichas(active);
+      const [fichasRes, consRes] = await Promise.allSettled([
+        api.getFichas(),
+        api.getConsultorios(),
+      ]);
 
-      const enCurso = active.find((f) => f.estado === "EN_CURSO");
-      // Auto-llamar solo cuando cambia el paciente actualmente en curso.
-      if (enCurso && lastAutoCalledIdRef.current !== enCurso.id) {
-        lastAutoCalledIdRef.current = enCurso.id;
-        setCalling(enCurso);
-        setTimeout(() => setCalling(null), 8000);
+      if (fichasRes.status === "fulfilled") {
+        const active = (fichasRes.value as WaitingFicha[]).filter(
+          (f) => f.estado === "ESPERA" || f.estado === "EN_CURSO",
+        );
+        setFichas(active);
+
+        const enCurso = active.find((f) => f.estado === "EN_CURSO");
+        // Auto-llamar solo cuando cambia el paciente actualmente en curso.
+        if (enCurso && lastAutoCalledIdRef.current !== enCurso.id) {
+          lastAutoCalledIdRef.current = enCurso.id;
+          setCalling(enCurso);
+          setTimeout(() => setCalling(null), 8000);
+        }
+      }
+
+      if (consRes.status === "fulfilled") {
+        setConsultorios(consRes.value as SalaOption[]);
       }
     } catch (err) {
       console.error(err);
@@ -85,16 +122,30 @@ export const WaitingRoom: React.FC<{ onClose?: () => void }> = ({
     return () => clearInterval(interval);
   }, [loadData]);
 
-  // Carga salas y doctores al abrir el modal
+  // Carga salas y doctores al abrir el modal (con pre-selección semi-automática)
   useEffect(() => {
     if (!iniciarId) return;
-    Promise.all([api.getConsultorios(), api.getUsuarios("VETERINARIO")])
-      .then(([cons, docs]) => {
-        setSalas((cons as SalaOption[]).filter((c) => c.estado === "LIBRE"));
-        setDoctores(docs as DoctorOption[]);
-        setIniciarForm({ doctor_id: "", consultorio_id: "" });
-      })
-      .catch(console.error);
+    Promise.allSettled([
+      api.getConsultorios(),
+      api.getVeterinarios(),
+    ]).then(([consRes, docsRes]) => {
+      const freeSalas =
+        consRes.status === "fulfilled"
+          ? (consRes.value as SalaOption[]).filter((c) => c.estado === "LIBRE")
+          : [];
+      const docs =
+        docsRes.status === "fulfilled" ? (docsRes.value as DoctorOption[]) : [];
+      setSalas(freeSalas);
+      setDoctores(docs);
+      // Semi-automático: sugiere la primera sala libre y el primer doctor.
+      // El recepcionista puede cambiarlos antes de confirmar.
+      setIniciarForm({
+        doctor_id: docs[0]?.id ?? "",
+        consultorio_id: freeSalas[0]?.id ?? "",
+      });
+      if (consRes.status === "rejected") console.error(consRes.reason);
+      if (docsRes.status === "rejected") console.error(docsRes.reason);
+    });
   }, [iniciarId]);
 
   const handleManualCall = (ficha: WaitingFicha) => {
@@ -149,9 +200,13 @@ export const WaitingRoom: React.FC<{ onClose?: () => void }> = ({
   const fichaModal = fichas.find((f) => f.id === iniciarId);
   const enEspera = fichas.filter((f) => f.estado === "ESPERA");
   const enCurso = fichas.filter((f) => f.estado === "EN_CURSO");
+  const salasLibres = consultorios.filter((c) => c.estado === "LIBRE");
 
   return (
-    <div className="flex h-full w-full flex-col bg-slate-950 text-white overflow-hidden font-sans">
+    <div
+      ref={rootRef}
+      className="flex h-full w-full flex-col bg-slate-950 text-white overflow-hidden font-sans"
+    >
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px]" />
       </div>
@@ -171,18 +226,86 @@ export const WaitingRoom: React.FC<{ onClose?: () => void }> = ({
             </p>
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-4xl font-black tabular-nums text-white">
-            {new Date().toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </p>
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-            Atención en Tiempo Real
-          </p>
+        <div className="flex items-center gap-6">
+          <button
+            onClick={toggleFullscreen}
+            title={
+              isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"
+            }
+            className="flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            {isFullscreen ? (
+              <Icons.Minimize size={22} />
+            ) : (
+              <Icons.Maximize size={22} />
+            )}
+          </button>
+          <div className="text-right">
+            <p className="text-4xl font-black tabular-nums text-white">
+              {new Date().toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              Atención en Tiempo Real
+            </p>
+          </div>
         </div>
       </header>
+
+      {/* Panel de consultorios — disponibilidad de salas en tiempo real */}
+      <section className="relative flex-shrink-0 px-12 py-4 border-b border-white/5 bg-slate-900/40">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-black uppercase tracking-widest text-slate-500">
+            Consultorios
+          </h2>
+          <span className="text-xs font-bold text-slate-400">
+            <span className="text-primary">{salasLibres.length}</span> de{" "}
+            {consultorios.length} libres
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {consultorios.length === 0 ? (
+            <span className="text-xs text-slate-600 font-bold uppercase tracking-widest">
+              Sin consultorios registrados
+            </span>
+          ) : (
+            consultorios.map((c) => {
+              const libre = c.estado === "LIBRE";
+              const ocupado = c.estado === "OCUPADO";
+              return (
+                <div
+                  key={c.id}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 border",
+                    libre
+                      ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                      : ocupado
+                        ? "bg-red-500/10 text-red-300 border-red-500/30"
+                        : "bg-blue-500/10 text-blue-300 border-blue-500/30",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "h-2 w-2 rounded-full",
+                      libre
+                        ? "bg-emerald-400"
+                        : ocupado
+                          ? "bg-red-400"
+                          : "bg-blue-400",
+                    )}
+                  />
+                  {c.nombre}
+                  <span className="opacity-60">
+                    · {libre ? "Libre" : ocupado ? "Ocupado" : "Limpieza"}
+                  </span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </section>
 
       {/* Main */}
       <main className="relative flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
@@ -320,7 +443,7 @@ export const WaitingRoom: React.FC<{ onClose?: () => void }> = ({
                 </p>
                 {ficha.doctor && (
                   <p className="text-sm font-bold opacity-70 mt-1">
-                    Dr. {ficha.doctor.nombre}
+                    {conDr(ficha.doctor.nombre)}
                   </p>
                 )}
               </div>
@@ -416,7 +539,7 @@ export const WaitingRoom: React.FC<{ onClose?: () => void }> = ({
                     <option value="">— Seleccionar doctor —</option>
                     {doctores.map((d) => (
                       <option key={d.id} value={d.id}>
-                        Dr. {d.nombre}
+                        {conDr(d.nombre)}
                       </option>
                     ))}
                   </select>
@@ -485,8 +608,8 @@ export const WaitingRoom: React.FC<{ onClose?: () => void }> = ({
             emergencias 24 horas
           </span>
           <span className="flex items-center gap-3 text-sm font-bold uppercase tracking-widest text-slate-400">
-            <Icons.Laboratory className="text-blue-500" size={16} /> Laboratorio
-            clínico avanzado disponible
+            <Icons.Clinical className="text-primary" size={16} /> Atención
+            veterinaria profesional y cercana
           </span>
         </div>
       </footer>
