@@ -4,6 +4,7 @@ import { Icons } from "../constants";
 import { cn } from "../utils/cn";
 import { api } from "../utils/api";
 import { FichaPendiente, ReciboCaja } from "../types";
+import { ArqueoModal } from "../components/ArqueoModal";
 
 type MetodoPago = "EFECTIVO" | "TARJETA" | "QR";
 type Tab = "CONSULTAS" | "VENTA_DIRECTA" | "HISTORIAL";
@@ -85,6 +86,7 @@ export const POS: React.FC = () => {
   const [exito, setExito] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [arqueoOpen, setArqueoOpen] = useState(false);
 
   const fetchPendientes = useCallback(() => {
     setLoadingFichas(true);
@@ -280,13 +282,25 @@ export const POS: React.FC = () => {
       animate={{ opacity: 1 }}
       className="flex h-full overflow-hidden"
     >
+      {arqueoOpen && <ArqueoModal onClose={() => setArqueoOpen(false)} />}
+
       {/* ── Izquierda: Lista ── */}
       <section className="flex-1 flex flex-col bg-slate-50 dark:bg-slate-950 overflow-y-auto p-8">
         <header className="mb-6">
           <div className="flex justify-between items-end">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-              Caja Central
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                Caja Central
+              </h2>
+              <button
+                onClick={() => setArqueoOpen(true)}
+                title="Arqueo y cierre de caja"
+                className="flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-colors"
+              >
+                <Icons.POS size={16} />
+                Arqueo / Cierre
+              </button>
+            </div>
             <div className="flex bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
               <button
                 onClick={() => setTab("CONSULTAS")}

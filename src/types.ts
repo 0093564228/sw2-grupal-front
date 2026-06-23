@@ -10,7 +10,8 @@ export type ViewType =
   | "waiting-room"
   | "users"
   | "servicios"
-  | "consultation";
+  | "consultation"
+  | "solicitudes";
 
 // ── Catálogos ────────────────────────────────────────────────────────
 export interface Especie {

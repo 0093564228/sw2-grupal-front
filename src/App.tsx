@@ -21,6 +21,7 @@ import { api } from "./utils/api";
 
 import { Login } from "./views/Login";
 import { Landing } from "./views/Landing";
+import { Solicitudes } from "./views/Solicitudes";
 
 // ── Panel de Notificaciones ─────────────────────────────────────────────
 interface FichaEspera {
@@ -238,10 +239,53 @@ const App: React.FC = () => {
     () => !!localStorage.getItem("token"),
   );
   const [currentView, setCurrentView] = useState<ViewType>("dashboard");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Al cambiar de vista (incluido el menú móvil) cerramos el cajón lateral.
+  const handleViewChange = (view: ViewType) => {
+    setCurrentView(view);
+    setMobileMenuOpen(false);
+  };
   const [isDarkMode, setIsDarkMode] = useState(() =>
     document.documentElement.classList.contains("dark"),
   );
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifCount, setNotifCount] = useState(0);
+
+  // Cuenta de alertas REALES (fichas esperando >10 min + productos con stock
+  // bajo) para mostrar el punto rojo solo cuando hay algo. Personal nada más;
+  // se refresca cada minuto.
+  useEffect(() => {
+    const rol = JSON.parse(localStorage.getItem("user") || "{}")?.rol?.nombre;
+    if (rol === "CLIENTE") {
+      setNotifCount(0);
+      return;
+    }
+    let activo = true;
+    const cargarAlertas = () => {
+      Promise.all([api.getFichas({ estado: "ESPERA" }), api.getProductos()])
+        .then(([f, p]) => {
+          if (!activo) return;
+          const now = Date.now();
+          const esperando = (f as FichaEspera[]).filter(
+            (fi) =>
+              Math.round((now - new Date(fi.fecha_hora).getTime()) / 60000) >=
+              10,
+          ).length;
+          const bajo = (p as ProductoBajo[]).filter(
+            (pr) => Number(pr.stock_actual) <= Number(pr.stock_minimo),
+          ).length;
+          setNotifCount(esperando + bajo);
+        })
+        .catch(() => {});
+    };
+    cargarAlertas();
+    const id = setInterval(cargarAlertas, 60000);
+    return () => {
+      activo = false;
+      clearInterval(id);
+    };
+  }, []);
 
   // Escuchar cambios en la URL (para el modo Kiosk y Landing)
   useEffect(() => {
@@ -290,6 +334,8 @@ const App: React.FC = () => {
       }
       case "users":
         return <Users />;
+      case "solicitudes":
+        return <Solicitudes />;
       case "waiting-room":
         return <WaitingRoom onClose={() => setCurrentView("dashboard")} />;
       case "consultation":
@@ -339,17 +385,29 @@ const App: React.FC = () => {
         closeButton
         theme={isDarkMode ? "dark" : "light"}
       />
-      <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+      <Sidebar
+        currentView={currentView}
+        onViewChange={handleViewChange}
+        mobileOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+      />
 
       <main className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-8 dark:border-slate-800 dark:bg-slate-900 transition-colors duration-300">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 dark:bg-slate-800">
+        <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-8 dark:border-slate-800 dark:bg-slate-900 transition-colors duration-300">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              title="Abrir menú"
+              className="flex lg:hidden h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              <Icons.Menu size={22} />
+            </button>
+            <div className="hidden md:flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 dark:bg-slate-800">
               <Icons.Search size={18} className="text-slate-400" />
               <input
                 type="text"
                 placeholder="Buscar en el sistema..."
-                className="bg-transparent text-sm outline-none text-slate-900 dark:text-slate-100 w-64"
+                className="bg-transparent text-sm outline-none text-slate-900 dark:text-slate-100 w-40 lg:w-64"
               />
             </div>
           </div>
@@ -367,7 +425,11 @@ const App: React.FC = () => {
                 className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <Icons.Bell size={20} />
-                <span className="absolute right-2 top-2 flex h-2 w-2 rounded-full bg-red-500"></span>
+                {notifCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">
+                    {notifCount > 9 ? "9+" : notifCount}
+                  </span>
+                )}
               </button>
               <AnimatePresence>
                 {showNotifications && (
@@ -377,9 +439,9 @@ const App: React.FC = () => {
                 )}
               </AnimatePresence>
             </div>
-            <div className="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
-            <div className="flex items-center gap-3 pl-2">
-              <div className="flex flex-col items-end">
+            <div className="hidden sm:block h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
+            <div className="flex items-center gap-3 pl-0 sm:pl-2">
+              <div className="hidden sm:flex flex-col items-end">
                 <p className="text-sm font-bold text-slate-900 dark:text-slate-100">
                   {JSON.parse(localStorage.getItem("user") || "{}").nombre ??
                     "Usuario"}

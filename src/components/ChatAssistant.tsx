@@ -15,7 +15,7 @@ export const ChatAssistant: React.FC = () => {
     {
       role: "bot",
       content:
-        "¡Hola! Soy VET-AI. Estoy aquí para ayudarte con emergencias veterinarias. ¿Qué sucede con tu mascota?",
+        "¡Hola! Soy VET-AI 🐾 Cuéntame qué le pasa a tu mascota (qué ocurrió, especie y desde cuándo) y te doy primeros auxilios paso a paso hasta que llegues al veterinario.",
     },
   ]);
   const [input, setInput] = useState("");
@@ -76,7 +76,7 @@ export const ChatAssistant: React.FC = () => {
             }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 20 }}
-            className="mb-4 w-[380px] h-[550px] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col"
+            className="mb-4 w-[380px] max-w-[calc(100vw-3rem)] h-[550px] max-h-[calc(100vh-7rem)] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col"
           >
             <header className="bg-gradient-to-r from-primary to-emerald-500 p-6 text-slate-900">
               <div className="flex items-center justify-between">

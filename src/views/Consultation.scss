@@ -4,6 +4,27 @@
   padding: 20px;
   height: calc(100vh - 100px);
 
+  // Responsivo: en pantallas chicas apila las columnas y deja crecer el alto.
+  @media (max-width: 1024px) {
+    flex-direction: column;
+    height: auto;
+
+    .fichas-list {
+      width: 100%;
+      max-height: 220px;
+      border-right: none;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .consultation-panel {
+      flex-direction: column;
+
+      .left-panel {
+        width: 100%;
+      }
+    }
+  }
+
   .fichas-list {
     width: 250px;
     border-right: 1px solid #ddd;
